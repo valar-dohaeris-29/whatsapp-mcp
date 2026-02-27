@@ -292,4 +292,4 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.DEBUG)
     # Start an HTTP server on port 8000
-    mcp.run(transport="streamable-http")
+    mcp.run(transport="sse")
