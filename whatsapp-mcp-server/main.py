@@ -269,12 +269,12 @@ def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
 
 @mcp.custom_route("/", methods=["GET", "POST"])
 async def root(request):
-    return JSONResponse({"status": "running"})
+    # return JSONResponse({"status": "running"})
 
-# @mcp.custom_route("/list_tools", methods=["GET"])
-# async def list_tools(request):
-#     tools = await mcp.list_tools()
-#     return JSONResponse(content=[tool.model_dump() for tool in tools])
+    # @mcp.custom_route("/list_tools", methods=["GET"])
+    # async def list_tools(request):
+    tools = await mcp.list_tools()
+    return JSONResponse(content=[tool.model_dump() for tool in tools])
 
 
 @mcp.custom_route("/health", methods=["GET"])
