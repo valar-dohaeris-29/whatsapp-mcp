@@ -1,5 +1,5 @@
 import os
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from mcp.server.fastmcp import FastMCP
 from whatsapp import (
     search_contacts as whatsapp_search_contacts,
@@ -20,7 +20,8 @@ from starlette.responses import JSONResponse
 # Initialize FastMCP server
 PORT = os.getenv("PORT", 10000)
 HOST = os.getenv("HOST", "0.0.0.0")
-mcp = FastMCP("whatsapp_mcp", host=HOST, port=PORT)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
+mcp = FastMCP("whatsapp_mcp", host=HOST, port=PORT, log_level=LOG_LEVEL)
 
 
 @mcp.tool()
