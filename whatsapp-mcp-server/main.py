@@ -1,6 +1,9 @@
+import logging
 import os
 from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
+from fastmcp.utilities.logging import get_logger
+
 from whatsapp import (
     search_contacts as whatsapp_search_contacts,
     list_messages as whatsapp_list_messages,
@@ -280,5 +283,7 @@ if __name__ == "__main__":
     # mcp.run(transport='stdio')
     # mcp.run(transport='sse')
 
+    to_client_logger = get_logger(name="fastmcp.server.context.to_client")
+    to_client_logger.setLevel(level=logging.DEBUG)
     # Start an HTTP server on port 8000
     mcp.run(transport="streamable-http")
