@@ -14,9 +14,11 @@ from whatsapp import (
     send_audio_message as whatsapp_audio_voice_message,
     download_media as whatsapp_download_media
 )
+from starlette.responses import JSONResponse
 
 # Initialize FastMCP server
-mcp = FastMCP("whatsapp")
+mcp = FastMCP("whatsapp_mcp")
+
 
 @mcp.tool()
 def search_contacts(query: str) -> List[Dict[str, Any]]:
@@ -28,18 +30,19 @@ def search_contacts(query: str) -> List[Dict[str, Any]]:
     contacts = whatsapp_search_contacts(query)
     return contacts
 
+
 @mcp.tool()
 def list_messages(
-    after: Optional[str] = None,
-    before: Optional[str] = None,
-    sender_phone_number: Optional[str] = None,
-    chat_jid: Optional[str] = None,
-    query: Optional[str] = None,
-    limit: int = 20,
-    page: int = 0,
-    include_context: bool = True,
-    context_before: int = 1,
-    context_after: int = 1
+        after: Optional[str] = None,
+        before: Optional[str] = None,
+        sender_phone_number: Optional[str] = None,
+        chat_jid: Optional[str] = None,
+        query: Optional[str] = None,
+        limit: int = 20,
+        page: int = 0,
+        include_context: bool = True,
+        context_before: int = 1,
+        context_after: int = 1
 ) -> List[Dict[str, Any]]:
     """Get WhatsApp messages matching specified criteria with optional context.
     
@@ -69,13 +72,14 @@ def list_messages(
     )
     return messages
 
+
 @mcp.tool()
 def list_chats(
-    query: Optional[str] = None,
-    limit: int = 20,
-    page: int = 0,
-    include_last_message: bool = True,
-    sort_by: str = "last_active"
+        query: Optional[str] = None,
+        limit: int = 20,
+        page: int = 0,
+        include_last_message: bool = True,
+        sort_by: str = "last_active"
 ) -> List[Dict[str, Any]]:
     """Get WhatsApp chats matching specified criteria.
     
@@ -95,6 +99,7 @@ def list_chats(
     )
     return chats
 
+
 @mcp.tool()
 def get_chat(chat_jid: str, include_last_message: bool = True) -> Dict[str, Any]:
     """Get WhatsApp chat metadata by JID.
@@ -106,6 +111,7 @@ def get_chat(chat_jid: str, include_last_message: bool = True) -> Dict[str, Any]
     chat = whatsapp_get_chat(chat_jid, include_last_message)
     return chat
 
+
 @mcp.tool()
 def get_direct_chat_by_contact(sender_phone_number: str) -> Dict[str, Any]:
     """Get WhatsApp chat metadata by sender phone number.
@@ -115,6 +121,7 @@ def get_direct_chat_by_contact(sender_phone_number: str) -> Dict[str, Any]:
     """
     chat = whatsapp_get_direct_chat_by_contact(sender_phone_number)
     return chat
+
 
 @mcp.tool()
 def get_contact_chats(jid: str, limit: int = 20, page: int = 0) -> List[Dict[str, Any]]:
@@ -128,6 +135,7 @@ def get_contact_chats(jid: str, limit: int = 20, page: int = 0) -> List[Dict[str
     chats = whatsapp_get_contact_chats(jid, limit, page)
     return chats
 
+
 @mcp.tool()
 def get_last_interaction(jid: str) -> str:
     """Get most recent WhatsApp message involving the contact.
@@ -138,11 +146,12 @@ def get_last_interaction(jid: str) -> str:
     message = whatsapp_get_last_interaction(jid)
     return message
 
+
 @mcp.tool()
 def get_message_context(
-    message_id: str,
-    before: int = 5,
-    after: int = 5
+        message_id: str,
+        before: int = 5,
+        after: int = 5
 ) -> Dict[str, Any]:
     """Get context around a specific WhatsApp message.
     
@@ -154,10 +163,11 @@ def get_message_context(
     context = whatsapp_get_message_context(message_id, before, after)
     return context
 
+
 @mcp.tool()
 def send_message(
-    recipient: str,
-    message: str
+        recipient: str,
+        message: str
 ) -> Dict[str, Any]:
     """Send a WhatsApp message to a person or group. For group chats use the JID.
 
@@ -175,13 +185,14 @@ def send_message(
             "success": False,
             "message": "Recipient must be provided"
         }
-    
+
     # Call the whatsapp_send_message function with the unified recipient parameter
     success, status_message = whatsapp_send_message(recipient, message)
     return {
         "success": success,
         "message": status_message
     }
+
 
 @mcp.tool()
 def send_file(recipient: str, media_path: str) -> Dict[str, Any]:
@@ -195,13 +206,14 @@ def send_file(recipient: str, media_path: str) -> Dict[str, Any]:
     Returns:
         A dictionary containing success status and a status message
     """
-    
+
     # Call the whatsapp_send_file function
     success, status_message = whatsapp_send_file(recipient, media_path)
     return {
         "success": success,
         "message": status_message
     }
+
 
 @mcp.tool()
 def send_audio_message(recipient: str, media_path: str) -> Dict[str, Any]:
@@ -221,6 +233,7 @@ def send_audio_message(recipient: str, media_path: str) -> Dict[str, Any]:
         "message": status_message
     }
 
+
 @mcp.tool()
 def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
     """Download media from a WhatsApp message and get the local file path.
@@ -233,7 +246,7 @@ def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
         A dictionary containing success status, a status message, and the file path if successful
     """
     file_path = whatsapp_download_media(message_id, chat_jid)
-    
+
     if file_path:
         return {
             "success": True,
@@ -246,6 +259,22 @@ def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
             "message": "Failed to download media"
         }
 
+
+@mcp.custom_route("/list_tools", methods=["GET"])
+async def list_tools(request):
+    tools = await mcp.list_tools()
+    return JSONResponse(content=[tool.model_dump() for tool in tools])
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request):
+    return JSONResponse({"status": "healthy", "service": "whatsapp_mcp"})
+
+
 if __name__ == "__main__":
     # Initialize and run the server
-    mcp.run(transport='stdio')
+    # mcp.run(transport='stdio')
+    # mcp.run(transport='sse')
+
+    # Start an HTTP server on port 8000
+    mcp.run(transport="streamable-http")
