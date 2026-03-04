@@ -849,6 +849,15 @@ func main() {
 		return
 	}
 	defer messageStore.Close()
+	
+	// Set PORT env var
+	port := 10000
+	if p := os.Getenv("PORT"); p != "" {
+	fmt.Sscanf(p, "%d", &port)
+	}
+
+	// Start REST API server
+	startRESTServer(client, messageStore, port)
 
 	// Setup event handling for messages and history sync
 	client.AddEventHandler(func(evt interface{}) {
@@ -920,9 +929,6 @@ func main() {
 	}
 
 	fmt.Println("\n✓ Connected to WhatsApp! Type 'help' for commands.")
-
-	// Start REST API server
-	startRESTServer(client, messageStore, 10000)
 
 	// Create a channel to keep the main goroutine alive
 	exitChan := make(chan os.Signal, 1)
