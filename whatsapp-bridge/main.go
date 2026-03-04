@@ -849,15 +849,6 @@ func main() {
 		return
 	}
 	defer messageStore.Close()
-	
-	// Set PORT env var
-	port := 10000
-	if p := os.Getenv("PORT"); p != "" {
-	fmt.Sscanf(p, "%d", &port)
-	}
-
-	// Start REST API server
-	startRESTServer(client, messageStore, port)
 
 	// Setup event handling for messages and history sync
 	client.AddEventHandler(func(evt interface{}) {
@@ -877,6 +868,15 @@ func main() {
 			logger.Warnf("Device logged out, please scan QR code to log in again")
 		}
 	})
+
+	// Read port from environment variable
+	port := 10000
+	if p := os.Getenv("PORT"); p != "" {
+		fmt.Sscanf(p, "%d", &port)
+	}
+
+	// Start REST API server
+	startRESTServer(client, messageStore, port)
 
 	// Create channel to track connection success
 	connected := make(chan bool, 1)
