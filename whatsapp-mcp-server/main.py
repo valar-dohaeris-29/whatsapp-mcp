@@ -1,8 +1,6 @@
-import logging
 import os
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
-from fastmcp.utilities.logging import get_logger
 
 from whatsapp import (
     search_contacts as whatsapp_search_contacts,
@@ -16,7 +14,7 @@ from whatsapp import (
     send_message as whatsapp_send_message,
     send_file as whatsapp_send_file,
     send_audio_message as whatsapp_audio_voice_message,
-    download_media as whatsapp_download_media
+    download_media as whatsapp_download_media, Chat, MessageContext, Contact
 )
 from starlette.responses import JSONResponse
 
@@ -28,7 +26,7 @@ mcp = FastMCP("whatsapp_mcp", host=HOST, port=PORT, log_level=LOG_LEVEL)
 
 
 @mcp.tool()
-def search_contacts(query: str) -> List[Dict[str, Any]]:
+def search_contacts(query: str) -> list[Contact]:
     """Search WhatsApp contacts by name or phone number.
     
     Args:
@@ -50,7 +48,7 @@ def list_messages(
         include_context: bool = True,
         context_before: int = 1,
         context_after: int = 1
-) -> List[Dict[str, Any]]:
+) -> str:
     """Get WhatsApp messages matching specified criteria with optional context.
     
     Args:
@@ -87,7 +85,7 @@ def list_chats(
         page: int = 0,
         include_last_message: bool = True,
         sort_by: str = "last_active"
-) -> List[Dict[str, Any]]:
+) -> list[Chat]:
     """Get WhatsApp chats matching specified criteria.
     
     Args:
@@ -108,7 +106,7 @@ def list_chats(
 
 
 @mcp.tool()
-def get_chat(chat_jid: str, include_last_message: bool = True) -> Dict[str, Any]:
+def get_chat(chat_jid: str, include_last_message: bool = True) -> Chat | None:
     """Get WhatsApp chat metadata by JID.
     
     Args:
@@ -120,7 +118,7 @@ def get_chat(chat_jid: str, include_last_message: bool = True) -> Dict[str, Any]
 
 
 @mcp.tool()
-def get_direct_chat_by_contact(sender_phone_number: str) -> Dict[str, Any]:
+def get_direct_chat_by_contact(sender_phone_number: str) -> Chat | None:
     """Get WhatsApp chat metadata by sender phone number.
     
     Args:
@@ -131,7 +129,7 @@ def get_direct_chat_by_contact(sender_phone_number: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
-def get_contact_chats(jid: str, limit: int = 20, page: int = 0) -> List[Dict[str, Any]]:
+def get_contact_chats(jid: str, limit: int = 20, page: int = 0) -> list[Chat]:
     """Get all WhatsApp chats involving the contact.
     
     Args:
@@ -159,7 +157,7 @@ def get_message_context(
         message_id: str,
         before: int = 5,
         after: int = 5
-) -> Dict[str, Any]:
+) -> MessageContext:
     """Get context around a specific WhatsApp message.
     
     Args:
@@ -284,12 +282,13 @@ async def health_check(request):
 
 if __name__ == "__main__":
     # Initialize and run the server
-    # mcp.run(transport='stdio')
+    mcp.run(transport='stdio')
     # mcp.run(transport='sse')
+    #
+    # to_client_logger = get_logger(name="fastmcp.server.context.to_client")
+    # to_client_logger.setLevel(level=logging.DEBUG)
+    #
+    # logging.basicConfig(level=logging.DEBUG)
+    # # Start an HTTP server on port 8000
+    # mcp.run(transport="sse")
 
-    to_client_logger = get_logger(name="fastmcp.server.context.to_client")
-    to_client_logger.setLevel(level=logging.DEBUG)
-
-    logging.basicConfig(level=logging.DEBUG)
-    # Start an HTTP server on port 8000
-    mcp.run(transport="sse")

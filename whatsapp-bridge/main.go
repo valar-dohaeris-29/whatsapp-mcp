@@ -66,11 +66,12 @@ func NewMessageStore() (*MessageStore, error) {
 			name TEXT,
 			last_message_time TIMESTAMP
 		);
-		
+
 		CREATE TABLE IF NOT EXISTS messages (
 			id TEXT,
 			chat_jid TEXT,
 			sender TEXT,
+			sender_name TEXT,
 			content TEXT,
 			timestamp TIMESTAMP,
 			is_from_me BOOLEAN,
@@ -90,6 +91,9 @@ func NewMessageStore() (*MessageStore, error) {
 		return nil, fmt.Errorf("failed to create tables: %v", err)
 	}
 
+	// Migrate existing databases: add sender_name column if missing
+	db.Exec(`ALTER TABLE messages ADD COLUMN sender_name TEXT`)
+
 	return &MessageStore{db: db}, nil
 }
 
@@ -108,7 +112,7 @@ func (store *MessageStore) StoreChat(jid, name string, lastMessageTime time.Time
 }
 
 // Store a message in the database
-func (store *MessageStore) StoreMessage(id, chatJID, sender, content string, timestamp time.Time, isFromMe bool,
+func (store *MessageStore) StoreMessage(id, chatJID, sender, senderName, content string, timestamp time.Time, isFromMe bool,
 	mediaType, filename, url string, mediaKey, fileSHA256, fileEncSHA256 []byte, fileLength uint64) error {
 	// Only store if there's actual content or media
 	if content == "" && mediaType == "" {
@@ -116,10 +120,10 @@ func (store *MessageStore) StoreMessage(id, chatJID, sender, content string, tim
 	}
 
 	_, err := store.db.Exec(
-		`INSERT OR REPLACE INTO messages 
-		(id, chat_jid, sender, content, timestamp, is_from_me, media_type, filename, url, media_key, file_sha256, file_enc_sha256, file_length) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, chatJID, sender, content, timestamp, isFromMe, mediaType, filename, url, mediaKey, fileSHA256, fileEncSHA256, fileLength,
+		`INSERT OR REPLACE INTO messages
+		(id, chat_jid, sender, sender_name, content, timestamp, is_from_me, media_type, filename, url, media_key, file_sha256, file_enc_sha256, file_length)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, chatJID, sender, senderName, content, timestamp, isFromMe, mediaType, filename, url, mediaKey, fileSHA256, fileEncSHA256, fileLength,
 	)
 	return err
 }
@@ -439,6 +443,7 @@ func handleMessage(client *whatsmeow.Client, messageStore *MessageStore, msg *ev
 		msg.Info.ID,
 		chatJID,
 		sender,
+		msg.Info.PushName,
 		content,
 		msg.Info.Timestamp,
 		msg.Info.IsFromMe,
@@ -1111,6 +1116,8 @@ func handleHistorySync(client *whatsmeow.Client, messageStore *MessageStore, his
 					}
 					if !isFromMe && msg.Message.Key.Participant != nil && *msg.Message.Key.Participant != "" {
 						sender = *msg.Message.Key.Participant
+					} else if !isFromMe && msg.Message.GetParticipant() != "" {
+						sender = msg.Message.GetParticipant()
 					} else if isFromMe {
 						sender = client.Store.ID.User
 					} else {
@@ -1118,6 +1125,22 @@ func handleHistorySync(client *whatsmeow.Client, messageStore *MessageStore, his
 					}
 				} else {
 					sender = jid.User
+				}
+
+				// Resolve sender display name: prefer PushName, fall back to contacts store
+				senderName := msg.Message.GetPushName()
+				if senderName == "" && !isFromMe && sender != jid.User && !strings.HasSuffix(sender, "@g.us") {
+					senderJID, err := types.ParseJID(sender)
+					if err != nil {
+						// sender may be a bare user string without server
+						senderJID = types.JID{User: sender, Server: "s.whatsapp.net"}
+					}
+					contact, err := client.Store.Contacts.GetContact(context.Background(), senderJID)
+					if err == nil && contact.FullName != "" {
+						senderName = contact.FullName
+					} else if err == nil && contact.PushName != "" {
+						senderName = contact.PushName
+					}
 				}
 
 				// Store message
@@ -1138,6 +1161,7 @@ func handleHistorySync(client *whatsmeow.Client, messageStore *MessageStore, his
 					msgID,
 					chatJID,
 					sender,
+					senderName,
 					content,
 					timestamp,
 					isFromMe,
