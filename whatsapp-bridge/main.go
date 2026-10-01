@@ -24,6 +24,8 @@ import (
 
 	"go.mau.fi/whatsmeow"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"go.mau.fi/whatsmeow/proto/waCompanionReg"
+	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -812,6 +814,20 @@ func main() {
 	logger := waLog.Stdout("Client", "INFO", true)
 	logger.Infof("Starting WhatsApp client...")
 
+	// Ask the phone for as much message history as it will give us.
+	// These props are only sent during pairing, so an existing session must be
+	// logged out and re-paired for a change here to take effect.
+	store.DeviceProps.RequireFullSync = proto.Bool(true)
+	if store.DeviceProps.HistorySyncConfig == nil {
+		store.DeviceProps.HistorySyncConfig = &waCompanionReg.DeviceProps_HistorySyncConfig{}
+	}
+	// Only raise the limits. The defaults also carry the Support* capability flags
+	// (group history, call logs, polls/reactions) that we want to keep, so don't
+	// replace the whole struct.
+	store.DeviceProps.HistorySyncConfig.FullSyncDaysLimit = proto.Uint32(3650)
+	store.DeviceProps.HistorySyncConfig.FullSyncSizeMbLimit = proto.Uint32(2048)
+	store.DeviceProps.HistorySyncConfig.StorageQuotaMb = proto.Uint32(10240)
+
 	// Create database connection for storing session data
 	dbLog := waLog.Stdout("Database", "INFO", true)
 
@@ -896,9 +912,25 @@ func main() {
 			return
 		}
 
+		// Optional: pair with a code instead of a QR. Set PAIR_PHONE to the
+		// phone number (country code, digits only, e.g. 27821234567).
+		pairPhone := os.Getenv("PAIR_PHONE")
+		if pairPhone != "" {
+			code, err := client.PairPhone(context.Background(), pairPhone, true, whatsmeow.PairClientChrome, "Chrome (Linux)")
+			if err != nil {
+				logger.Errorf("Failed to request pairing code: %v", err)
+				return
+			}
+			fmt.Printf("\nPairing code: %s\n", code)
+			fmt.Println("On your phone: WhatsApp > Linked Devices > Link a device > Link with phone number instead, then enter the code above.")
+		}
+
 		// Print QR code for pairing with phone
 		for evt := range qrChan {
 			if evt.Event == "code" {
+				if pairPhone != "" {
+					continue // pairing by code, no need to draw the QR
+				}
 				fmt.Println("\nScan this QR code with your WhatsApp app:")
 				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
 			} else if evt.Event == "success" {
@@ -912,7 +944,7 @@ func main() {
 		case <-connected:
 			fmt.Println("\nSuccessfully connected and authenticated!")
 		case <-time.After(3 * time.Minute):
-			logger.Errorf("Timeout waiting for QR code scan")
+			logger.Errorf("Timeout waiting for pairing")
 			return
 		}
 	} else {
